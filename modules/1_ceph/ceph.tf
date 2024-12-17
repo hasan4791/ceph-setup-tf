@@ -261,7 +261,7 @@ resource "null_resource" "ceph_packages" {
       "sudo yum update -y --skip-broken",
       "sudo yum install -y wget jq git net-tools vim python3 tar tmux",
       "dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm",
-      "dnf install -y ceph",
+      "dnf install -y ceph  https://rpmfind.net/linux/centos-stream/9-stream/CRB/ppc64le/os/Packages/lua-devel-5.4.4-4.el9.ppc64le.rpm https://rpmfind.net/linux/centos-stream/9-stream/AppStream/ppc64le/os/Packages/lua-5.4.4-4.el9.ppc64le.rpm",
     ]
   }
   provisioner "remote-exec" {
@@ -458,7 +458,7 @@ resource "null_resource" "scp_ceph_config_1" {
 }
 
 resource "null_resource" "scp_ceph_config_2" {
-  depends_on = [null_resource.scp_ceph_config_1,null_resource.ceph_reboot, null_resource.setup_ceph_disk]
+  depends_on = [null_resource.ceph_ceph_init,null_resource.scp_ceph_config_1,null_resource.ceph_reboot, null_resource.setup_ceph_disk]
 #  count      = local.ceph_count
   provisioner "remote-exec" {
     inline = [
