@@ -26,7 +26,7 @@ terraform {
     }
     openstack = {
       source  = "terraform-provider-openstack/openstack"
-      version = "~> 1.32"
+      version = "~> 3.3.2"
     }
     random = {
       source  = "hashicorp/random"
