@@ -1,0 +1,5 @@
+.terraform*
+terraform.tfstate*
+var.tfvars
+var.tfvars_*
+var.tfvars.ceph*

@@ -53,7 +53,7 @@ data "openstack_compute_flavor_v2" "ceph" {
 resource "openstack_compute_instance_v2" "ceph" {
   count = local.ceph_count
 
-  name      = "${var.cluster_id}-ceph-node-${count.index}"
+  name      = "${var.nick_name}-${var.cluster_id}-ceph-node-${count.index}"
   image_id  = var.ceph["image_id"]
   flavor_id = var.scg_id == "" ? data.openstack_compute_flavor_v2.ceph.id : openstack_compute_flavor_v2.ceph_scg[0].id
   key_pair  = openstack_compute_keypair_v2.key-pair.0.name
@@ -74,7 +74,6 @@ resource "null_resource" "ceph_init" {
     private_key  = var.private_key
     agent        = var.ssh_agent
     timeout      = "${var.connection_timeout}m"
-   
   }
   provisioner "remote-exec" {
     inline = [
@@ -97,7 +96,6 @@ resource "null_resource" "ceph_init" {
       "echo 'HOSTNAME=${lower(var.cluster_id)}-node-${count.index}.${lower(var.cluster_id)}.${var.cluster_domain}' | sudo tee -a /etc/sysconfig/network > /dev/null",
       "sudo hostname -F /etc/hostname",
       "echo 'vm.max_map_count = 262144' | sudo tee --append /etc/sysctl.conf > /dev/null",
-      "dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm",
     ]
   }
 }
@@ -114,7 +112,6 @@ resource "null_resource" "ceph_init_etc_hosts" {
     private_key  = var.private_key
     agent        = var.ssh_agent
     timeout      = "${var.connection_timeout}m"
-   
   }
   provisioner "remote-exec" {
     inline = [
@@ -140,7 +137,6 @@ resource "null_resource" "ceph_register" {
     rhel_username      = var.rhel_username
     private_key        = var.private_key
     ssh_agent          = var.ssh_agent
-    
     connection_timeout = var.connection_timeout
   }
 
@@ -151,7 +147,6 @@ resource "null_resource" "ceph_register" {
     private_key  = self.triggers.private_key
     agent        = self.triggers.ssh_agent
     timeout      = "${self.triggers.connection_timeout}m"
-    
   }
 
   provisioner "remote-exec" {
@@ -186,7 +181,6 @@ EOF
       private_key  = self.triggers.private_key
       agent        = self.triggers.ssh_agent
       timeout      = "${self.triggers.connection_timeout}m"
-      
     }
 
     when       = destroy
@@ -215,7 +209,6 @@ resource "null_resource" "enable_repos" {
     inline = [<<EOF
 # Additional repo for installing ansible package
 if ( [[ -z "${var.rhel_subscription_username}" ]] || [[ "${var.rhel_subscription_username}" == "<subscription-id>" ]] ) && [[ -z "${var.rhel_subscription_org}" ]]; then
-  sudo yum install -y epel-release
   sudo yum install -y ansible
 elif [[ "$(printf '%s\n' "8.5" "$(cat /etc/redhat-release | sed 's/[^0-9.]*//g')" | sort -V | head -n1)" == "8.5" ]]; then
   # Compared release version with 8.5 (eg: 8.10 > 8.5)
@@ -241,6 +234,17 @@ EOF
       "EOF",
     ]
   }
+  provisioner "remote-exec" {
+    inline = [
+      "cat << EOF > /etc/yum.repos.d/rhceph.repo",
+      "[rhceph]",
+      "baseurl=${var.rhceph_repo}",
+      "enabled=1",
+      "gpgcheck=0",
+      "countme=1",
+      "EOF",
+    ]
+  }
 }
 
 resource "null_resource" "ceph_packages" {
@@ -254,14 +258,18 @@ resource "null_resource" "ceph_packages" {
     private_key  = var.private_key
     agent        = var.ssh_agent
     timeout      = "${var.connection_timeout}m"
-   
   }
   provisioner "remote-exec" {
     inline = [
       "sudo yum update -y --skip-broken",
-      "sudo yum install -y wget jq git net-tools vim python3 tar tmux",
+      "sudo yum install -y wget jq git net-tools vim python3 tar tmux gdb strace fmt",
       "dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm",
-      "dnf install -y ceph",
+      "dnf install -y ceph  \\",
+      "https://rpmfind.net/linux/centos-stream/9-stream/CRB/ppc64le/os/Packages/lua-devel-5.4.4-4.el9.ppc64le.rpm \\",
+      "https://rpmfind.net/linux/centos-stream/9-stream/AppStream/ppc64le/os/Packages/lua-5.4.4-4.el9.ppc64le.rpm \\",
+      "https://rpmfind.net/linux/epel/9/Everything/ppc64le/Packages/l/luarocks-3.9.2-5.el9.noarch.rpm \\",
+      "https://rpmfind.net/linux/epel/9/Everything/ppc64le/Packages/l/liboath-2.6.12-1.el9.ppc64le.rpm",
+      "dnf debuginfo-install -y ceph-osd",
     ]
   }
   provisioner "remote-exec" {
@@ -328,7 +336,6 @@ resource "null_resource" "ceph_config" {
     private_key  = var.private_key
     agent        = var.ssh_agent
     timeout      = "${var.connection_timeout}m"
-   
   }
   provisioner "remote-exec" {
     inline = [
@@ -364,7 +371,6 @@ resource "null_resource" "ceph_ceph_init" {
     private_key  = var.private_key
     agent        = var.ssh_agent
     timeout      = "${var.connection_timeout}m"
-   
   }
   provisioner "remote-exec" {
     inline = [
@@ -453,18 +459,16 @@ resource "null_resource" "scp_ceph_config_1" {
     private_key  = var.private_key
     agent        = var.ssh_agent
     timeout      = "${var.connection_timeout}m"
-   
   }
 }
 
 resource "null_resource" "scp_ceph_config_2" {
-  depends_on = [null_resource.scp_ceph_config_1,null_resource.ceph_reboot, null_resource.setup_ceph_disk]
-#  count      = local.ceph_count
+  depends_on = [null_resource.ceph_ceph_init,null_resource.scp_ceph_config_1,null_resource.ceph_reboot, null_resource.setup_ceph_disk]
   provisioner "remote-exec" {
     inline = [
       <<EOT
         %{ for i in range(local.ceph_count) }
-          ssh -o StrictHostKeyChecking=no  -i ~/.ssh/id_rsa root@${openstack_compute_instance_v2.ceph[i].access_ip_v4} "ceph-volume raw prepare --data /dev/${local.disk_config.disk_name}"
+          ssh -o StrictHostKeyChecking=no  -i ~/.ssh/id_rsa root@${openstack_compute_instance_v2.ceph[i].access_ip_v4} "ceph-volume raw prepare --objectstore bluestore --data /dev/${local.disk_config.disk_name}"
           sleep 30
           ssh -o StrictHostKeyChecking=no  -i ~/.ssh/id_rsa root@${openstack_compute_instance_v2.ceph[i].access_ip_v4} "systemctl start ceph-osd@${i}.service"
           sleep 30
@@ -480,28 +484,21 @@ resource "null_resource" "scp_ceph_config_2" {
       private_key  = var.private_key
       agent        = var.ssh_agent
       timeout      = "${var.connection_timeout}m"
-     
     }
   }
 }
 
-resource "null_resource" "ceph_filesystem" {
+resource "null_resource" "ceph_mds" {
   depends_on = [null_resource.scp_ceph_config_2, null_resource.setup_ceph_disk]
   count = local.ceph_count
   provisioner "remote-exec" {
     inline = [
-      "mkdir -p /var/lib/ceph/mds/ceph-${lower(var.cluster_id)}-node-0",
-      "ceph-authtool --create-keyring /var/lib/ceph/mds/ceph-${lower(var.cluster_id)}-node-0/keyring --gen-key -n mds.${lower(var.cluster_id)}-node-0",
-      "chown -R ceph:ceph /var/lib/ceph/mds/ceph-${lower(var.cluster_id)}-node-0",
-      "ceph auth add mds.${lower(var.cluster_id)}-node-0 osd 'allow rwx' mds 'allow' mon 'allow profile mds' -i /var/lib/ceph/mds/ceph-${lower(var.cluster_id)}-node-0/keyring",
-      "systemctl enable --now ceph-mds@${lower(var.cluster_id)}-node-0",
-      "ceph osd pool create cephfs_data 32",
-      "ceph osd pool create cephfs_metadata 32",
-      "ceph fs new cephfs cephfs_metadata cephfs_data",
-      "ceph fs ls",
+      "mkdir -p /var/lib/ceph/mds/ceph-${lower(var.cluster_id)}-node-${count.index}",
+      "ceph-authtool --create-keyring /var/lib/ceph/mds/ceph-${lower(var.cluster_id)}-node-${count.index}/keyring --gen-key -n mds.${lower(var.cluster_id)}-node-${count.index}",
+      "chown -R ceph:ceph /var/lib/ceph/mds/ceph-${lower(var.cluster_id)}-node-${count.index}",
+      "ceph auth add mds.${lower(var.cluster_id)}-node-${count.index} osd 'allow rwx' mds 'allow' mon 'allow profile mds' -i /var/lib/ceph/mds/ceph-${lower(var.cluster_id)}-node-${count.index}/keyring",
+      "systemctl enable --now ceph-mds@${lower(var.cluster_id)}-node-${count.index}",
       "ceph mds stat",
-      "ceph fs status cephfs",
-
     ]
   }
   connection {
@@ -511,16 +508,56 @@ resource "null_resource" "ceph_filesystem" {
     private_key  = var.private_key
     agent        = var.ssh_agent
     timeout      = "${var.connection_timeout}m"
-   
+  }
+}
+
+resource "null_resource" "create_new_rule" {
+  depends_on = [null_resource.ceph_mds]
+  provisioner "remote-exec" {
+    inline = [
+      "ceph osd crush rule create-replicated rule-remote-storage default host $(ceph osd crush class ls | jq -r .[0])",
+      "ceph osd pool set .mgr crush_rule rule-remote-storage",
+      "ceph osd crush rule rm replicated_rule",
+      "ceph osd crush dump",
+    ]
+  }
+  connection {
+    type         = "ssh"
+    user         = var.rhel_username
+    host         = openstack_compute_instance_v2.ceph[0].access_ip_v4
+    private_key  = var.private_key
+    agent        = var.ssh_agent
+    timeout      = "${var.connection_timeout}m"
+  }
+}
+
+resource "null_resource" "ceph_filesystem" {
+  depends_on = [null_resource.create_new_rule]
+  provisioner "remote-exec" {
+    inline = [
+      "ceph osd pool create cephfs_data 32 rule-remote-storage",
+      "ceph osd pool create cephfs_metadata 32 rule-remote-storage",
+      "ceph fs new cephfs cephfs_metadata cephfs_data",
+      "ceph fs ls",
+      "ceph mds stat",
+      "ceph fs status cephfs",
+    ]
+  }
+  connection {
+    type         = "ssh"
+    user         = var.rhel_username
+    host         = openstack_compute_instance_v2.ceph[0].access_ip_v4
+    private_key  = var.private_key
+    agent        = var.ssh_agent
+    timeout      = "${var.connection_timeout}m"
   }
 }
 
 resource "null_resource" "ceph_rdb" {
-  depends_on = [null_resource.scp_ceph_config_2, null_resource.setup_ceph_disk]
-  count = local.ceph_count
+  depends_on = [null_resource.ceph_filesystem]
   provisioner "remote-exec" {
     inline = [
-      "ceph osd pool create rbd 32",
+      "ceph osd pool create rbd 32 rule-remote-storage",
       "ceph osd pool set rbd pg_autoscale_mode on",
       "rbd pool init rbd",
       "rbd create --size 10G --pool rbd rbd01",
@@ -534,7 +571,6 @@ resource "null_resource" "ceph_rdb" {
       private_key  = var.private_key
       agent        = var.ssh_agent
       timeout      = "${var.connection_timeout}m"
-     
     }
   }
 }
@@ -580,7 +616,6 @@ resource "null_resource" "setup_ceph_disk" {
     private_key  = var.private_key
     agent        = var.ssh_agent
     timeout      = "${var.connection_timeout}m"
-   
   }
   provisioner "file" {
     content     = templatefile("${path.module}/templates/create_disk_link.sh", local.disk_config)

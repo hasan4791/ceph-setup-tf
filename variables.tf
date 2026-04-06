@@ -75,6 +75,10 @@ variable "ceph" {
   }
 }
 
+variable "nick_name" {
+  description = "Added as prefix to the instance name for easy identification"
+}
+
 
 variable "network_name" {
   description = "The name of the network to be used for deploy operations"
@@ -249,6 +253,12 @@ variable "ceph_repo" {
   description = "Set the repo URL for using ceph"
   # Repo for running ceph helpernode setup steps.
   default = "http://9.114.181.66/ceph-6/"
+}
+
+variable "rhceph_repo" {
+  description = "Set the repo URL for using ceph dependencies"
+  # Repo for running ceph helpernode setup steps.
+  default = "http://9.114.181.66/rhceph/9"
 }
 
 locals {

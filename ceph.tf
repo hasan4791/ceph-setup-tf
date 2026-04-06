@@ -44,8 +44,8 @@ module "ceph" {
 
   cluster_domain                  = var.cluster_domain
   cluster_id                      = local.cluster_id
-  ceph                         = var.ceph
-  ceph_port_ids                = module.network.ceph_port_ids
+  ceph                            = var.ceph
+  ceph_port_ids                   = module.network.ceph_port_ids
   scg_id                          = var.scg_id
   openstack_availability_zone     = var.openstack_availability_zone
   rhel_username                   = var.rhel_username
@@ -65,11 +65,13 @@ module "ceph" {
   fips_compliant                  = var.fips_compliant
   scg_flavor_is_public            = var.scg_flavor_is_public
   ceph_repo                       = var.ceph_repo
+  rhceph_repo                     = var.rhceph_repo
   codeready_builder_repo          = var.codeready_builder_repo
   baseos_repo                     = var.baseos_repo
   appstream_repo                  = var.appstream_repo
   supplementary_repo              = var.supplementary_repo
   highavailability_repo           = var.highavailability_repo
+  nick_name                       = var.nick_name
 }
 
 module "network" {

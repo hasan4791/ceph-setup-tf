@@ -27,6 +27,7 @@ variable "cluster_id" {
 variable "ceph" {}
 variable "ceph_port_ids" {}
 variable "ceph_repo" {}
+variable "rhceph_repo" {}
 variable "codeready_builder_repo" {}
 variable "baseos_repo" {}
 variable "appstream_repo" {}
@@ -55,3 +56,5 @@ variable "storage_type" {}
 variable "volume_storage_template" {}
 
 variable "fips_compliant" {}
+
+variable "nick_name" {}
