@@ -227,17 +227,14 @@ EOF
     inline = [
       "cat << EOF > /etc/yum.repos.d/ceph.repo",
       "[ceph]",
+      "name=Ceph Local Repository",
       "baseurl=${var.ceph_repo}",
       "enabled=1",
       "gpgcheck=0",
       "countme=1",
-      "EOF",
-    ]
-  }
-  provisioner "remote-exec" {
-    inline = [
-      "cat << EOF > /etc/yum.repos.d/rhceph.repo",
+
       "[rhceph]",
+      "name=RH Ceph Repository",
       "baseurl=${var.rhceph_repo}",
       "enabled=1",
       "gpgcheck=0",
@@ -261,8 +258,8 @@ resource "null_resource" "ceph_packages" {
   }
   provisioner "remote-exec" {
     inline = [
-      "sudo yum update -y --skip-broken",
-      "sudo yum install -y wget jq git net-tools vim python3 tar tmux gdb strace fmt",
+      "sudo dnf update -y --skip-broken",
+      "sudo dnf install -y wget jq git net-tools vim python3 tar tmux gdb strace fmt",
       "dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm",
       "dnf install -y ceph  \\",
       "https://rpmfind.net/linux/centos-stream/9-stream/CRB/ppc64le/os/Packages/lua-devel-5.4.4-4.el9.ppc64le.rpm \\",
